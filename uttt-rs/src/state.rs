@@ -305,3 +305,16 @@ pub struct Move {
     /// Range can be assumed to be between 0 and 8 inclusive.
     pub minor: u32,
 }
+
+impl Move {
+    /// Create a new [`Move`].
+    ///
+    /// # Panics
+    /// This method panics if the major index is greater than 8 or the minor index is greater than
+    /// 8.
+    pub fn new(major: u32, minor: u32) -> Self {
+        assert!(major <= 8);
+        assert!(minor <= 8);
+        Self { major, minor }
+    }
+}

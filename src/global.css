@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.game-board {
+  /* 
+  width = height = 3 * 36 + 2 * 6 = 120 = 480px 
+  3 cells and 2 gutters
+  */
+  width: 480px;
+  height: 480px;
+  @apply grid grid-cols-3 gap-6;
+}
+
+.sub-board {
+  /* 
+  width = height = 3 * 10 + 2 * 3 
+  3 cells and 2 gutters
+  */
+  @apply w-36 h-36 grid grid-cols-3 gap-3;
+}
+
+.cell {
+  @apply w-10 h-10 inline-block bg-gray-300 border-gray-400 border-2 rounded-md transition-colors;
+}
+
+.cell:not(.x):not(.o) {
+  @apply hover:bg-gray-400 border-gray-500 border-2;
+}
+
+.cell.x {
+  @apply bg-red-400 border-red-500;
+}
+
+.cell.o {
+  @apply bg-green-400 border-green-500;
+}
