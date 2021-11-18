@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 bumpalo = "3.8.0"
+rand = "0.8.4"

@@ -79,10 +79,10 @@ impl Board {
                 // Since we know the major position of the move, we only need to recompute the win
                 // state for one of the sub-boards. We also know the player so we only need to
                 // re-compute the bitfield of the player.
-                match sub_board.x.has_winner() {
-                    HasWinner::Yes => self.sub_wins.x.0 |= 1 << m.major,
-                    HasWinner::Tie => self.sub_wins.tie.0 |= 1 << m.major,
-                    HasWinner::InProgress => {}
+                if sub_board.x.has_winner() == HasWinner::Yes {
+                    self.sub_wins.x.0 |= 1 << m.major
+                } else if sub_board.x.0 | sub_board.o.0 == 0b111111111 {
+                    self.sub_wins.tie.0 |= 1 << m.major
                 }
 
                 // Update `next_sub_board` for next turn.
@@ -102,10 +102,10 @@ impl Board {
                 self.player_to_move = Player::X;
 
                 // Update `sub_wins` to keep state in sync. See above for more details.
-                match sub_board.o.has_winner() {
-                    HasWinner::Yes => self.sub_wins.o.0 |= 1 << m.major,
-                    HasWinner::Tie => self.sub_wins.tie.0 |= 1 << m.major,
-                    HasWinner::InProgress => {}
+                if sub_board.o.has_winner() == HasWinner::Yes {
+                    self.sub_wins.o.0 |= 1 << m.major
+                } else if sub_board.x.0 | sub_board.o.0 == 0b111111111 {
+                    self.sub_wins.tie.0 |= 1 << m.major
                 }
 
                 // Update `next_sub_board` for next turn. See above for more details.
