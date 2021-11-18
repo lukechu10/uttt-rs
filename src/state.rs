@@ -16,6 +16,14 @@ pub enum HasWinner {
     InProgress,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Winner {
+    X,
+    O,
+    Tie,
+    InProgress,
+}
+
 /// Representation of the Ultimate-TicTacToe game board.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Board {
@@ -79,7 +87,8 @@ impl Board {
 
                 // Update `next_sub_board` for next turn.
                 // The next sub-board index is the same as the minor index for this turn.
-                if self.sub_wins.x.0 | 1 << m.minor != 0 {
+                let sub_wins_or = self.sub_wins.o.0 | self.sub_wins.x.0 | self.sub_wins.tie.0;
+                if sub_wins_or & 1 << m.minor != 0 {
                     // The next sub-board has already been won. Next player can move anywhere.
                     self.next_sub_board = 9;
                 } else {
@@ -100,7 +109,8 @@ impl Board {
                 }
 
                 // Update `next_sub_board` for next turn. See above for more details.
-                if self.sub_wins.o.0 | 1 << m.minor != 0 {
+                let sub_wins_or = self.sub_wins.o.0 | self.sub_wins.x.0 | self.sub_wins.tie.0;
+                if sub_wins_or & 1 << m.minor != 0 {
                     self.next_sub_board = 9;
                 } else {
                     self.next_sub_board = m.minor;
@@ -139,7 +149,7 @@ impl Board {
                         let or = sub_board.x.0 | sub_board.o.0;
                         // Sub-board is available. Generate moves for sub-board.
                         for j in 0..=8 {
-                            if or & 1 << i == 0 {
+                            if or & 1 << j == 0 {
                                 moves.push(Move {
                                     major: i as u32,
                                     minor: j,
@@ -153,6 +163,18 @@ impl Board {
         }
 
         moves
+    }
+
+    pub fn winner(&self) -> Winner {
+        if self.sub_wins.x.has_winner() == HasWinner::Yes {
+            Winner::X
+        } else if self.sub_wins.o.has_winner() == HasWinner::Yes {
+            Winner::O
+        } else if self.sub_wins.x.0 | self.sub_wins.o.0 | self.sub_wins.tie.0 == 0b111111111 {
+            Winner::Tie
+        } else {
+            Winner::InProgress
+        }
     }
 }
 
