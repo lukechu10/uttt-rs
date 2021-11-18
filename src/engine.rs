@@ -1,6 +1,7 @@
 //! MCTS algorithm.
 
 use std::cell::{Cell, RefCell};
+use std::time::Instant;
 
 use bumpalo::Bump;
 use rand::prelude::SliceRandom;
@@ -21,13 +22,14 @@ pub struct Node<'a> {
     children: RefCell<NodeChildren<'a>>,
     board: Board,
     is_terminal: bool,
+    previous_move: Option<Move>,
 
     wins: Cell<f32>,
     visits: Cell<u32>,
 }
 
 impl<'a> Node<'a> {
-    pub fn new(parent: Option<&'a Self>, board: Board) -> Self {
+    pub fn new(parent: Option<&'a Self>, board: Board, previous_move: Option<Move>) -> Self {
         let mut unexpanded = board.generate_moves();
 
         // Shuffle unexpanded nodes.
@@ -47,6 +49,7 @@ impl<'a> Node<'a> {
             children: RefCell::new(children),
             board,
             is_terminal,
+            previous_move,
             wins: Cell::new(0.0),
             visits: Cell::new(0),
         }
@@ -60,7 +63,7 @@ impl<'a> Node<'a> {
     ///
     /// # Panics
     /// This method panics if the node is already fully expanded.
-    pub fn expand(&'a self, bump: &'a mut Bump) {
+    pub fn expand(&'a self, bump: &'a Bump) {
         let m = self
             .children
             .borrow_mut()
@@ -71,7 +74,7 @@ impl<'a> Node<'a> {
         // Expand node.
         // SAFETY: m is a valid Move.
         let next = unsafe { self.board.advance_state(m) };
-        let next_node = Node::new(Some(self), next);
+        let next_node = Node::new(Some(self), next, Some(m));
         let next_node_ref = bump.alloc(next_node);
         self.children.borrow_mut().expanded.push(next_node_ref);
     }
@@ -139,31 +142,13 @@ impl<'a> Node<'a> {
         }
         best_child
     }
-}
-
-pub struct MctsEngine<'a> {
-    bump: Bump,
-    root: Option<&'a Node<'a>>,
-}
-
-impl<'a> MctsEngine<'a> {
-    pub fn new() -> Self {
-        let bump = Bump::new();
-
-        Self { bump, root: None }
-    }
-
-    pub fn initialize(&'a mut self, board: Board) {
-        let root = self.bump.alloc(Node::new(None, board));
-        self.root = Some(root);
-    }
 
     /// # Panics
     /// This method panics if the engine is not initialized. Initialize the engine with
     /// `initialize()` first.
-    pub fn traverse(&self) -> &'a Node<'a> {
+    pub fn traverse(&'a self) -> &'a Self {
         // Start at the root node.
-        let mut node = self.root.expect("root node must exist");
+        let mut node = self;
         while node.is_fully_expanded() && !node.is_terminal {
             match node.select_best_child_uct() {
                 Some(tmp) => node = tmp,
@@ -172,6 +157,64 @@ impl<'a> MctsEngine<'a> {
         }
 
         node
+    }
+}
+
+pub struct MctsEngine<'a> {
+    bump: Bump,
+    root: Cell<Option<&'a Node<'a>>>,
+}
+
+impl<'a> MctsEngine<'a> {
+    pub fn new() -> Self {
+        let bump = Bump::new();
+
+        Self {
+            bump,
+            root: Cell::new(None),
+        }
+    }
+
+    pub fn initialize(&'a self, board: Board) {
+        let root = self.bump.alloc(Node::new(None, board, None));
+        self.root.set(Some(root));
+    }
+
+    pub fn run_search(&'a self) {
+        const TIME_BUDGET_MS: u128 = 30;
+        let start = Instant::now();
+
+        while start.elapsed().as_millis() < TIME_BUDGET_MS {
+            // Phase 1: selection
+            let node = self.root.get().expect("must have a root node").traverse();
+            if node.is_fully_expanded() {
+                let winner = node.rollout();
+                node.back_propagate(winner);
+                continue;
+            }
+            // Phase 2: expansion
+            node.expand(&self.bump);
+            // Phase 3: rollout
+            let winner = node.rollout();
+            // Phase 4: back-propagation
+            node.back_propagate(winner);
+        }
+    }
+
+    /// # Panics
+    /// Panics if the engine is not initialized. Panics if no moves available for the given state.
+    pub fn best_move(&self) -> Move {
+        let node = self.root.get().expect("must have a root node");
+
+        // Find best child node.
+        let children = node.children.borrow();
+        children
+            .expanded
+            .iter()
+            .max_by_key(|x| x.visits.get())
+            .expect("state does not have any valid moves")
+            .previous_move
+            .unwrap()
     }
 }
 
