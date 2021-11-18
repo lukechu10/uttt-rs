@@ -1,10 +1,15 @@
 //! Data structures for representing the state of the game.
 
+use std::fmt::{self, Display, Formatter};
+use std::ops::{BitAnd, BitOr};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Player {
     X,
     O,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HasWinner {
     Yes,
     Tie,
@@ -12,20 +17,174 @@ pub enum HasWinner {
 }
 
 /// Representation of the Ultimate-TicTacToe game board.
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Board {
-    pub sub_wins: SubBoard,
+    pub sub_wins: WinBoard,
     pub board: [SubBoard; 9],
     pub player_to_move: Player,
+    /// The index of the next sub-board. If next player can only move in a specific sub-board, the
+    /// value will be in the range of `0..9`. If next player can move anywhere, the value will be
+    /// `9`.
+    pub next_sub_board: u32,
 }
 
 impl Default for Board {
     fn default() -> Self {
         Self {
-            sub_wins: SubBoard::default(),
+            sub_wins: WinBoard::default(),
             board: [SubBoard::default(); 9],
             // Player X always starts.
             player_to_move: Player::X,
+            // Initially can move anywhere.
+            next_sub_board: 9,
         }
+    }
+}
+
+impl Board {
+    /// Create a new [`Board`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the [`Board`] with the applied [`Move`] onto it. This does not change the original
+    /// [`Board`].
+    ///
+    /// Switches the next player to move.
+    ///
+    /// # Safety
+    ///
+    /// - `m` must be a valid [`Move`], meaning that the `major` field and the `minor` field must be
+    ///   between `0` and `8` inclusive. Any value outside this range will cause undefined behavior.
+    #[must_use = "advanced_state does not modify original Board"]
+    pub unsafe fn advance_state(mut self, m: Move) -> Self {
+        // SAFETY: range is guaranteed to be valid by the caller. `board` is of length 9 and m.major
+        // is in range 0..9.
+        let sub_board = self.board.get_unchecked_mut(m.major as usize);
+
+        match self.player_to_move {
+            Player::X => {
+                sub_board.x = sub_board.x.advance_state(m.minor);
+                self.player_to_move = Player::O;
+
+                // Update `sub_wins` to keep state in sync.
+                // Since we know the major position of the move, we only need to recompute the win
+                // state for one of the sub-boards. We also know the player so we only need to
+                // re-compute the bitfield of the player.
+                match sub_board.x.has_winner() {
+                    HasWinner::Yes => self.sub_wins.x.0 |= 1 << m.major,
+                    HasWinner::Tie => self.sub_wins.tie.0 |= 1 << m.major,
+                    HasWinner::InProgress => {}
+                }
+
+                // Update `next_sub_board` for next turn.
+                // The next sub-board index is the same as the minor index for this turn.
+                if self.sub_wins.x.0 | 1 << m.minor != 0 {
+                    // The next sub-board has already been won. Next player can move anywhere.
+                    self.next_sub_board = 9;
+                } else {
+                    // The next sub-board has not been won. Next player can only move in this
+                    // sub-board.
+                    self.next_sub_board = m.minor;
+                }
+            }
+            Player::O => {
+                sub_board.o = sub_board.o.advance_state(m.minor);
+                self.player_to_move = Player::X;
+
+                // Update `sub_wins` to keep state in sync. See above for more details.
+                match sub_board.o.has_winner() {
+                    HasWinner::Yes => self.sub_wins.o.0 |= 1 << m.major,
+                    HasWinner::Tie => self.sub_wins.tie.0 |= 1 << m.major,
+                    HasWinner::InProgress => {}
+                }
+
+                // Update `next_sub_board` for next turn. See above for more details.
+                if self.sub_wins.o.0 | 1 << m.minor != 0 {
+                    self.next_sub_board = 9;
+                } else {
+                    self.next_sub_board = m.minor;
+                }
+            }
+        };
+
+        self
+    }
+
+    pub fn generate_moves(&self) -> Vec<Move> {
+        let mut moves = Vec::new();
+
+        match self.next_sub_board {
+            0..=8 => {
+                // Can only move in a specific sub-board.
+                let sub_board = self.board[self.next_sub_board as usize];
+                let or = sub_board.x.0 | sub_board.o.0;
+                for i in 0..=8 {
+                    if or & 1 << i == 0 {
+                        moves.push(Move {
+                            major: self.next_sub_board,
+                            minor: i,
+                        });
+                    }
+                }
+            }
+            9 => {
+                // Can move in any open spot that is not already won.
+                for i in 0..=8 {
+                    if self.sub_wins.x.0 & 1 << i == 0
+                        && self.sub_wins.o.0 & 1 << i == 0
+                        && self.sub_wins.tie.0 & 1 << i == 0
+                    {
+                        let sub_board = self.board[i];
+                        let or = sub_board.x.0 | sub_board.o.0;
+                        // Sub-board is available. Generate moves for sub-board.
+                        for j in 0..=8 {
+                            if or & 1 << i == 0 {
+                                moves.push(Move {
+                                    major: i as u32,
+                                    minor: j,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            _ => unreachable!("invalid value for self.next_sub_board"),
+        }
+
+        moves
+    }
+}
+
+impl Display for Board {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for major_row in 0..3 {
+            for minor_row in 0..3 {
+                for major_col in 0..3 {
+                    for minor_col in 0..3 {
+                        let major = major_row * 3 + major_col;
+                        let minor = minor_row * 3 + minor_col;
+
+                        let sub_board = self.board[major];
+                        let mask = 1 << minor;
+                        if sub_board.x.0 & mask != 0 {
+                            write!(f, "X")?;
+                        } else if sub_board.o.0 & mask != 0 {
+                            write!(f, "O")?;
+                        } else {
+                            write!(f, "_")?;
+                        }
+
+                        write!(f, " ")?;
+                    }
+                    write!(f, "  ")?;
+                }
+                writeln!(f)?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -33,6 +192,13 @@ impl Default for Board {
 pub struct SubBoard {
     pub x: BitBoard,
     pub o: BitBoard,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub struct WinBoard {
+    pub x: BitBoard,
+    pub o: BitBoard,
+    pub tie: BitBoard,
 }
 
 /// A `u16` bit board.
@@ -78,9 +244,37 @@ impl BitBoard {
         }
         HasWinner::InProgress
     }
+
+    /// Returns the bit board with the position of the move applied onto it. Does not change the
+    /// original bit board.
+    ///
+    /// Internally, this function sets the bit corresponding to the position which should be in the
+    /// range from `0` to `8` inclusive.
+    #[must_use = "advanced_state does not modify original BitBoard"]
+    pub fn advance_state(self, pos: u32) -> Self {
+        let bit = 1 << pos;
+        Self(self.0 | bit)
+    }
+}
+
+impl BitAnd for BitBoard {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl BitOr for BitBoard {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
 }
 
 /// Represents a position on the board. Does not store the player who applies the move.
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Move {
     /// The major index (position of the sub-board) of the move.
     /// Range can be assumed to be between 0 and 8 inclusive.
