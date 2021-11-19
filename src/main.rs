@@ -64,11 +64,11 @@ fn use_sub_board_state(board: ReadSignal<Board>, major: (u32, u32)) -> ReadSigna
 #[component(GameView<G>)]
 fn game_view() -> View<G> {
     let board = Signal::new(Board::new());
+    let difficulty = Signal::new(100);
     let msg = Signal::new("".to_string());
 
     // When board changes and player is O, run AI.
-    create_effect(cloned!(board, msg => move || {
-        const TIME_BUDGET_MS: u128 = 500;
+    create_effect(cloned!(board, difficulty, msg => move || {
         if board.get().player_to_move == Player::O {
             // Make sure that game is not finished.
             if board.get().winner() != Winner::InProgress {
@@ -76,21 +76,22 @@ fn game_view() -> View<G> {
             }
             msg.set("Running AI...".to_string());
             // We run the AI in the next micro-task to allow for transitions to finish.
-            spawn_local_in_scope(cloned!(board, msg => async move {
+            spawn_local_in_scope(cloned!(board, difficulty, msg => async move {
                 // Wait 300ms because that is the duration for the transition for sub-board state.
                 TimeoutFuture::new(300).await;
                 let mcts = MctsEngine::new();
                 mcts.initialize(*board.get());
-                let (iters, moves) = mcts.run_search(TIME_BUDGET_MS);
+                let (iters, moves) = mcts.run_search(*difficulty.get_untracked());
                 let m = mcts.best_move();
                 board.set(board.get().advance_state(m).unwrap());
 
-                msg.set(format!("AI simulated {} games and {} moves in {}ms.", iters, moves, TIME_BUDGET_MS));
+                msg.set(format!("AI simulated {} games and {} moves in {}ms.", iters, moves, *difficulty.get_untracked()));
             }));
         }
     }));
 
     view! {
+        DifficultySelector(difficulty)
         p(class="h-12 py-2") {
             (msg.get())
         }
@@ -186,6 +187,43 @@ fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
                 None => ""
             })
         }
+    }
+}
+
+#[component(DifficultySelector<G>)]
+fn difficulty_selector(difficulty: Signal<u128>) -> View<G> {
+    view! {
+        h2(class="text-lg") { "Difficulty:" }
+        div(class="flex flex-row space-x-4") {
+            Indexed(IndexedProps {
+                iterable: Signal::new(vec![
+                    ("Noob", 50),
+                    ("Easy", 100),
+                    ("Medium", 500),
+                    ("Hard", 1000),
+                    ("Boss", 2000),
+                    ("Insane", 5000),
+                ]).into_handle(),
+                template: move |(name, value)| view! {
+                    DifficultyOption((difficulty.clone(), name, value))
+                },
+            })
+        }
+    }
+}
+
+#[component(DifficultyOption<G>)]
+fn difficulty_option(props: (Signal<u128>, &'static str, u128)) -> View<G> {
+    let (difficulty, name, value) = props;
+    let class = create_memo(cloned!(difficulty => move || {
+        if *difficulty.get() == value {
+            "font-bold underline"
+        } else {
+            ""
+        }
+    }));
+    view! {
+        button(class=class.get(), on:click=move |_| difficulty.set(value)) { (name) ": " (value) "ms" }
     }
 }
 

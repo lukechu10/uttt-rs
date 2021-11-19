@@ -102,48 +102,34 @@ impl<'a> Node<'a> {
     }
 
     pub fn back_propagate(&self, winner: Winner) {
-        // Increment self visit count.
-        self.visits.set(self.visits.get() + 1);
-        // Increment self win count.
-        if self.board.player_to_move == Player::X && winner == Winner::O
-            || self.board.player_to_move == Player::O && winner == Winner::X
-        {
-            self.wins.set(self.wins.get() + 1.0);
-        } else if winner == Winner::Tie {
-            self.wins.set(self.wins.get() + 0.5);
-        }
         // Walk up the node tree and increment parent visit/win count.
-        let mut node = self;
-        while let Some(parent) = node.parent {
-            if parent.board.player_to_move == Player::X && winner == Winner::O
-                || parent.board.player_to_move == Player::O && winner == Winner::X
+        let mut next = Some(self);
+        while let Some(node) = next {
+            if node.board.player_to_move == Player::X && winner == Winner::O
+                || node.board.player_to_move == Player::O && winner == Winner::X
             {
-                parent.wins.set(self.wins.get() + 1.0);
+                node.wins.set(self.wins.get() + 1.0);
             } else if winner == Winner::Tie {
-                parent.wins.set(self.wins.get() + 0.5);
+                node.wins.set(self.wins.get() + 0.5);
             }
-            parent.visits.set(parent.visits.get() + 1);
-            node = parent;
+            node.visits.set(node.visits.get() + 1);
+            next = node.parent;
         }
-    }
-
-    pub fn uct(&self) -> f32 {
-        let n = self.visits.get();
-        let w = self.wins.get();
-        let c = 1.0;
-        let n_plus_c = n as f32 + c;
-        w / n_plus_c + c * (2.0 * std::f32::consts::SQRT_2) / n_plus_c
     }
 
     pub fn select_best_child_uct(&self) -> Option<&'a Self> {
-        let mut best_child = None;
-        let mut best_uct = 0.0;
         let children = self.children.borrow();
-        for child in children.expanded.iter() {
-            let uct = child.uct();
-            if uct > best_uct {
+        let mut best_child = None;
+        let mut best_score = f32::MIN;
+        for child in &children.expanded {
+            let w = child.wins.get();
+            let v = child.visits.get();
+            // UCB1 formula.
+            let score = (w / v as f32)
+                + std::f32::consts::SQRT_2 * f32::sqrt(f32::ln(self.wins.get()) / v as f32);
+            if score > best_score {
                 best_child = Some(*child);
-                best_uct = uct;
+                best_score = score;
             }
         }
         best_child
