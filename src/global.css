@@ -4,27 +4,43 @@
 
 .game-board {
   /* 
-  width = height = 3 * 36 + 2 * 6 = 120 = 480px 
+  width = height = 3 * 42 + 2 * 3 = 132 = 528px 
   3 cells and 2 gutters
   */
-  width: 480px;
-  height: 480px;
-  @apply grid grid-cols-3 gap-6;
+  width: 528px;
+  height: 528px;
+  @apply grid grid-cols-3 gap-3;
 }
 
 .sub-board {
   /* 
-  width = height = 3 * 10 + 2 * 3 
-  3 cells and 2 gutters
+  width = height = 3 * 10 + 2 * 3 + 2 * 3 = 42 = 168px
+  3 cells and 2 gutters and 2 paddings
   */
-  @apply w-36 h-36 grid grid-cols-3 gap-3;
+  width: 168px;
+  height: 168px;
+  @apply grid grid-cols-3 gap-3 p-3 bg-gray-100 rounded-md transition duration-300;
+}
+
+.sub-board.next {
+  @apply bg-purple-200 hover:shadow-lg;
+}
+
+.sub-board.x {
+  @apply bg-red-200;
+}
+
+.sub-board.o {
+  @apply bg-green-100;
 }
 
 .cell {
-  @apply w-10 h-10 inline-block bg-gray-300 border-gray-400 border-2 rounded-md transition-colors;
+  text-align: center;
+  line-height: 2.2rem; /* Cell height is 2.5rem */
+  @apply w-10 h-10 inline-block bg-gray-300 border-gray-400 border-2 rounded-md transition-colors font-bold;
 }
 
-.cell:not(.x):not(.o) {
+.cell.empty {
   @apply hover:bg-gray-400 border-gray-500 border-2;
 }
 

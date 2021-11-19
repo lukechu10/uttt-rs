@@ -1,5 +1,5 @@
 use sycamore::prelude::*;
-use uttt_rs::{Board, Move, Player};
+use uttt_rs::{Board, Move, Player, Winner};
 
 #[component(App<G>)]
 fn app() -> View<G> {
@@ -28,6 +28,33 @@ fn use_board_cell(
             Some(Player::O)
         } else {
             None
+        }
+    })
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SubBoardState {
+    Winner(Winner),
+    Next,
+}
+
+fn use_sub_board_state(board: ReadSignal<Board>, major: (u32, u32)) -> ReadSignal<SubBoardState> {
+    let i = major.0 * 3 + major.1;
+
+    create_selector(move || {
+        // Check win state of sub-board.
+        let sub_board = board.get().sub_wins;
+        let mask = 1 << i;
+        if sub_board.x.0 & mask != 0 {
+            SubBoardState::Winner(Winner::X)
+        } else if sub_board.o.0 & mask != 0 {
+            SubBoardState::Winner(Winner::O)
+        } else if sub_board.tie.0 & mask != 0 {
+            SubBoardState::Winner(Winner::Tie)
+        } else if board.get().next_sub_board == 9 || board.get().next_sub_board == i {
+            SubBoardState::Next
+        } else {
+            SubBoardState::Winner(Winner::InProgress)
         }
     })
 }
@@ -64,8 +91,17 @@ fn game_board(board: Signal<Board>) -> View<G> {
 #[component(SubBoard<G>)]
 fn sub_board(props: (Signal<Board>, (u32, u32))) -> View<G> {
     let (board, major) = props;
+    let state = use_sub_board_state(board.handle(), major);
+    let class = create_memo(move || match *state.get() {
+        SubBoardState::Winner(Winner::X) => "sub-board x",
+        SubBoardState::Winner(Winner::O) => "sub-board o",
+        SubBoardState::Winner(Winner::Tie) => "sub-board tie",
+        SubBoardState::Next => "sub-board next",
+        SubBoardState::Winner(Winner::InProgress) => "sub-board in-progress",
+    });
+
     view! {
-        div(class="sub-board") {
+        div(class=class.get()) {
             ({
                 let mut tmp = Vec::new();
                 for i in 0..3 {
@@ -91,7 +127,7 @@ fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
         match *state.get() {
             Some(Player::X) => "cell x",
             Some(Player::O) => "cell o",
-            None => "cell",
+            None => "cell empty",
         }
     }));
 
