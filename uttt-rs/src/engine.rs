@@ -59,11 +59,11 @@ impl<'a> Node<'a> {
         self.children.borrow().unexpanded.is_empty()
     }
 
-    /// Expand the node.
+    /// Expand the node. Returns the expanded node.
     ///
     /// # Panics
     /// This method panics if the node is already fully expanded.
-    pub fn expand(&'a self, bump: &'a Bump) {
+    pub fn expand(&'a self, bump: &'a Bump) -> &'a Self {
         let m = self
             .children
             .borrow_mut()
@@ -77,22 +77,26 @@ impl<'a> Node<'a> {
         let next_node = Node::new(Some(self), next, Some(m));
         let next_node_ref = bump.alloc(next_node);
         self.children.borrow_mut().expanded.push(next_node_ref);
+        next_node_ref
     }
 
     /// Choose random moves starting from this state until a terminal state is reached.
     ///
     /// The returned [`Winner`] will never be [`Winner::InProgress`].
-    pub fn rollout(&self) -> Winner {
+    /// Also returns the number of moves simulated until the terminal state was reached.
+    pub fn rollout(&self) -> (Winner, u32) {
         let mut rng = thread_rng();
         let mut board = self.board;
+        let mut moves_count = 0;
         while board.winner() == Winner::InProgress {
             let moves = board.generate_moves();
             let m = moves.choose(&mut rng).unwrap();
             // SAFETY: m is a valid Move.
             board = unsafe { board.advance_state_unsafe(*m) };
+            moves_count += 1;
         }
 
-        board.winner()
+        (board.winner(), moves_count)
     }
 
     pub fn back_propagate(&self, winner: Winner) {
@@ -180,29 +184,32 @@ impl<'a> MctsEngine<'a> {
         self.root.set(Some(root));
     }
 
-    /// Runs MCTS search. Returns the number of iterations performed.
-    pub fn run_search(&'a self, time_budget_ms: u128) -> u32 {
+    /// Runs MCTS search. Returns the number of iterations performed and moves simulated.
+    pub fn run_search(&'a self, time_budget_ms: u128) -> (u32, u32) {
         let start = Instant::now();
 
-        let mut i = 0;
+        let mut iters = 0;
+        let mut moves = 0;
         while start.elapsed().as_millis() < time_budget_ms {
             // Phase 1: selection
             let node = self.root.get().expect("must have a root node").traverse();
             if node.is_fully_expanded() {
-                let winner = node.rollout();
+                let (winner, moves_count) = node.rollout();
+                moves += moves_count;
                 node.back_propagate(winner);
                 continue;
             }
             // Phase 2: expansion
-            node.expand(&self.bump);
+            let expanded = node.expand(&self.bump);
             // Phase 3: rollout
-            let winner = node.rollout();
+            let (winner, moves_count) = expanded.rollout();
+            moves += moves_count;
             // Phase 4: back-propagation
-            node.back_propagate(winner);
+            expanded.back_propagate(winner);
 
-            i+= 1
+            iters += 1
         }
-        i
+        (iters, moves)
     }
 
     /// # Panics

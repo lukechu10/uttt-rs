@@ -73,11 +73,11 @@ fn game_view() -> View<G> {
             }
             let mcts = MctsEngine::new();
             mcts.initialize(*board.get());
-            let iters = mcts.run_search(100);
+            let (iters, moves) = mcts.run_search(100);
             let m = mcts.best_move();
             board.set(board.get().advance_state(m).unwrap());
 
-            msg.set(format!("AI simulated {} games", iters));
+            msg.set(format!("AI simulated {} games and {} moves", iters, moves));
         }
     }));
 
