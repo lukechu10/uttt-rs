@@ -118,9 +118,9 @@ impl<'a> Node<'a> {
             if parent.board.player_to_move == Player::X && winner == Winner::O
                 || parent.board.player_to_move == Player::O && winner == Winner::X
             {
-                self.wins.set(self.wins.get() + 1.0);
+                parent.wins.set(self.wins.get() + 1.0);
             } else if winner == Winner::Tie {
-                self.wins.set(self.wins.get() + 0.5);
+                parent.wins.set(self.wins.get() + 0.5);
             }
             parent.visits.set(parent.visits.get() + 1);
             node = parent;
