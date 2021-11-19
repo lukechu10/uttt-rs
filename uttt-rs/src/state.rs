@@ -73,7 +73,7 @@ impl Board {
 
         match self.player_to_move {
             Player::X => {
-                sub_board.x = sub_board.x.advance_state(m.minor);
+                sub_board.x = sub_board.x.advance_bitfield_state(m.minor);
                 self.player_to_move = Player::O;
 
                 // Update `sub_wins` to keep state in sync.
@@ -99,7 +99,7 @@ impl Board {
                 }
             }
             Player::O => {
-                sub_board.o = sub_board.o.advance_state(m.minor);
+                sub_board.o = sub_board.o.advance_bitfield_state(m.minor);
                 self.player_to_move = Player::X;
 
                 // Update `sub_wins` to keep state in sync. See above for more details.
@@ -306,7 +306,8 @@ impl BitBoard {
     /// Internally, this function sets the bit corresponding to the position which should be in the
     /// range from `0` to `8` inclusive.
     #[must_use = "advanced_state does not modify original BitBoard"]
-    pub fn advance_state(self, pos: u32) -> Self {
+    #[inline(always)]
+    pub fn advance_bitfield_state(self, pos: u32) -> Self {
         let bit = 1 << pos;
         Self(self.0 | bit)
     }
