@@ -3,6 +3,7 @@ use rand::thread_rng;
 use uttt_rs::*;
 
 fn main() {
+    let mut total_move_counts = Vec::new();
     for _i in 0..100 {
         let mut board = Board::new();
         let mut moves = board.generate_moves();
@@ -33,5 +34,9 @@ fn main() {
             board.winner(),
             avg_move_count
         );
+        total_move_counts.push(avg_move_count);
     }
+    let total_avg_move_count =
+        total_move_counts.iter().sum::<u32>() / total_move_counts.len() as u32;
+    println!("Total avg. move count: {}", total_avg_move_count);
 }
