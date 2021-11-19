@@ -1,3 +1,5 @@
+use gloo_timers::future::TimeoutFuture;
+use sycamore::futures::spawn_local_in_scope;
 use sycamore::prelude::*;
 use uttt_rs::{Board, MctsEngine, Move, Player, Winner};
 
@@ -66,18 +68,25 @@ fn game_view() -> View<G> {
 
     // When board changes and player is O, run AI.
     create_effect(cloned!(board, msg => move || {
+        const TIME_BUDGET_MS: u128 = 500;
         if board.get().player_to_move == Player::O {
-            // Make sure that game is not finished.
-            if board.get().winner() != Winner::InProgress {
-                return;
-            }
-            let mcts = MctsEngine::new();
-            mcts.initialize(*board.get());
-            let (iters, moves) = mcts.run_search(100);
-            let m = mcts.best_move();
-            board.set(board.get().advance_state(m).unwrap());
+            msg.set("Running AI...".to_string());
+            // We run the AI in the next micro-task to allow for transitions to finish.
+            spawn_local_in_scope(cloned!(board, msg => async move {
+                // Wait 300ms because that is the duration for the transition for sub-board state.
+                TimeoutFuture::new(300).await;
+                // Make sure that game is not finished.
+                if board.get().winner() != Winner::InProgress {
+                    return;
+                }
+                let mcts = MctsEngine::new();
+                mcts.initialize(*board.get());
+                let (iters, moves) = mcts.run_search(TIME_BUDGET_MS);
+                let m = mcts.best_move();
+                board.set(board.get().advance_state(m).unwrap());
 
-            msg.set(format!("AI simulated {} games and {} moves", iters, moves));
+                msg.set(format!("AI simulated {} games and {} moves in {}ms.", iters, moves, TIME_BUDGET_MS));
+            }));
         }
     }));
 
@@ -182,6 +191,7 @@ fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
 
 fn main() {
     console_error_panic_hook::set_once();
+    console_log::init().expect("could not initialize console_log");
 
     sycamore::render(|| {
         view! {
