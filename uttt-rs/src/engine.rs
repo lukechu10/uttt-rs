@@ -33,7 +33,6 @@ impl<'a> Node<'a> {
         let mut unexpanded = board.generate_moves();
 
         // Shuffle unexpanded nodes.
-        // TODO: do not create a thread_rng each time.
         let mut rng = thread_rng();
         unexpanded.shuffle(&mut rng);
 
@@ -108,9 +107,9 @@ impl<'a> Node<'a> {
             if node.board.player_to_move == Player::X && winner == Winner::O
                 || node.board.player_to_move == Player::O && winner == Winner::X
             {
-                node.wins.set(self.wins.get() + 1.0);
+                node.wins.set(node.wins.get() + 1.0);
             } else if winner == Winner::Tie {
-                node.wins.set(self.wins.get() + 0.5);
+                node.wins.set(node.wins.get() + 0.5);
             }
             node.visits.set(node.visits.get() + 1);
             next = node.parent;
