@@ -3,7 +3,7 @@ use rand::thread_rng;
 use uttt_rs::*;
 
 fn main() {
-    for _i in 0..10 {
+    for _i in 0..100 {
         let mut board = Board::new();
         let mut moves = board.generate_moves();
         let mut winner = Winner::InProgress;
@@ -17,7 +17,7 @@ fn main() {
                 Player::X => {
                     let mcts = MctsEngine::new();
                     mcts.initialize(board);
-                    let (_iters, move_count) = mcts.run_search(5);
+                    let (_iters, move_count) = mcts.run_search(1);
                     move_counts.push(move_count);
                     mcts.best_move()
                 }
