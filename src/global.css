@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 .game-board {
+  @apply grid grid-cols-3 gap-3 select-none;
   /* 
   width = height = 3 * 42 + 2 * 3 = 132 = 528px 
   3 cells and 2 gutters
   */
   width: 528px;
   height: 528px;
-  @apply grid grid-cols-3 gap-3;
 }
 
 .sub-board {
+  @apply grid grid-cols-3 gap-3 p-3 bg-gray-100 rounded-md transition duration-300;
   /* 
   width = height = 3 * 10 + 2 * 3 + 2 * 3 = 42 = 168px
   3 cells and 2 gutters and 2 paddings
   */
   width: 168px;
   height: 168px;
-  @apply grid grid-cols-3 gap-3 p-3 bg-gray-100 rounded-md transition duration-300;
 }
 
 .sub-board.next {
@@ -35,9 +35,9 @@
 }
 
 .cell {
+  @apply w-10 h-10 inline-block bg-gray-300 border-gray-400 border-2 rounded-md transition-colors font-bold text-xl;
   text-align: center;
   line-height: 2.2rem; /* Cell height is 2.5rem */
-  @apply w-10 h-10 inline-block bg-gray-300 border-gray-400 border-2 rounded-md transition-colors font-bold;
 }
 
 .cell.empty {

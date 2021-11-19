@@ -15,7 +15,7 @@ fn main() {
                 Player::X => {
                     let mcts = MctsEngine::new();
                     mcts.initialize(board);
-                    mcts.run_search();
+                    mcts.run_search(30);
                     let m = mcts.best_move();
                     board = board.advance_state(m).unwrap();
                     moves = board.generate_moves();

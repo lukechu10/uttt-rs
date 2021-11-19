@@ -1,11 +1,11 @@
 use sycamore::prelude::*;
-use uttt_rs::{Board, Move, Player, Winner};
+use uttt_rs::{Board, MctsEngine, Move, Player, Winner};
 
 #[component(App<G>)]
 fn app() -> View<G> {
     view! {
         div(class="container mx-auto font-mono") {
-            h1(class="text-xl") { "Ultimate TicTacToe" }
+            h1(class="text-xl text-center mb-4 underline") { "Ultimate TicTacToe" }
             GameView()
         }
     }
@@ -62,8 +62,29 @@ fn use_sub_board_state(board: ReadSignal<Board>, major: (u32, u32)) -> ReadSigna
 #[component(GameView<G>)]
 fn game_view() -> View<G> {
     let board = Signal::new(Board::new());
+    let msg = Signal::new("".to_string());
+
+    // When board changes and player is O, run AI.
+    create_effect(cloned!(board, msg => move || {
+        if board.get().player_to_move == Player::O {
+            // Make sure that game is not finished.
+            if board.get().winner() != Winner::InProgress {
+                return;
+            }
+            let mcts = MctsEngine::new();
+            mcts.initialize(*board.get());
+            let iters = mcts.run_search(100);
+            let m = mcts.best_move();
+            board.set(board.get().advance_state(m).unwrap());
+
+            msg.set(format!("AI simulated {} games", iters));
+        }
+    }));
 
     view! {
+        p(class="h-12 py-2") {
+            (msg.get())
+        }
         GameBoard(board)
     }
 }
@@ -132,6 +153,14 @@ fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
     }));
 
     let on_click = move |_| {
+        // Make sure that it is player X's turn. TODO: allow user to choose player.
+        if board.get().player_to_move != Player::X {
+            return;
+        }
+        // Make sure that game is not finished.
+        if board.get().winner() != Winner::InProgress {
+            return;
+        }
         // Update board.
         let m = Move::new(major.0 * 3 + major.1, minor.0 * 3 + minor.1);
         let next = board.get().advance_state(m);
@@ -152,6 +181,8 @@ fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
 }
 
 fn main() {
+    console_error_panic_hook::set_once();
+
     sycamore::render(|| {
         view! {
             App()

@@ -1,9 +1,9 @@
 //! MCTS algorithm.
 
 use std::cell::{Cell, RefCell};
-use std::time::Instant;
 
 use bumpalo::Bump;
+use instant::Instant;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 
@@ -180,11 +180,12 @@ impl<'a> MctsEngine<'a> {
         self.root.set(Some(root));
     }
 
-    pub fn run_search(&'a self) {
-        const TIME_BUDGET_MS: u128 = 30;
+    /// Runs MCTS search. Returns the number of iterations performed.
+    pub fn run_search(&'a self, time_budget_ms: u128) -> u32 {
         let start = Instant::now();
 
-        while start.elapsed().as_millis() < TIME_BUDGET_MS {
+        let mut i = 0;
+        while start.elapsed().as_millis() < time_budget_ms {
             // Phase 1: selection
             let node = self.root.get().expect("must have a root node").traverse();
             if node.is_fully_expanded() {
@@ -198,7 +199,10 @@ impl<'a> MctsEngine<'a> {
             let winner = node.rollout();
             // Phase 4: back-propagation
             node.back_propagate(winner);
+
+            i+= 1
         }
+        i
     }
 
     /// # Panics
