@@ -70,15 +70,15 @@ fn game_view() -> View<G> {
     create_effect(cloned!(board, msg => move || {
         const TIME_BUDGET_MS: u128 = 500;
         if board.get().player_to_move == Player::O {
+            // Make sure that game is not finished.
+            if board.get().winner() != Winner::InProgress {
+                return;
+            }
             msg.set("Running AI...".to_string());
             // We run the AI in the next micro-task to allow for transitions to finish.
             spawn_local_in_scope(cloned!(board, msg => async move {
                 // Wait 300ms because that is the duration for the transition for sub-board state.
                 TimeoutFuture::new(300).await;
-                // Make sure that game is not finished.
-                if board.get().winner() != Winner::InProgress {
-                    return;
-                }
                 let mcts = MctsEngine::new();
                 mcts.initialize(*board.get());
                 let (iters, moves) = mcts.run_search(TIME_BUDGET_MS);

@@ -9,3 +9,6 @@ edition = "2021"
 bumpalo = "3.8.0"
 instant = "0.1.12"
 rand = "0.8.4"
+
+[profile.release]
+debug = true

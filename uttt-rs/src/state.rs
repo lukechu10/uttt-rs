@@ -152,9 +152,7 @@ impl Board {
         Some(unsafe { self.advance_state_unsafe(m) })
     }
 
-    pub fn generate_moves(&self) -> Vec<Move> {
-        let mut moves = Vec::new();
-
+    pub fn generate_moves_in_place(&self, moves: &mut Vec<Move>) {
         match self.next_sub_board {
             0..=8 => {
                 // Can only move in a specific sub-board.
@@ -192,7 +190,11 @@ impl Board {
             }
             _ => unreachable!("invalid value for self.next_sub_board"),
         }
+    }
 
+    pub fn generate_moves(&self) -> Vec<Move> {
+        let mut moves = Vec::new();
+        self.generate_moves_in_place(&mut moves);
         moves
     }
 

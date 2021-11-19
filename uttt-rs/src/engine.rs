@@ -88,11 +88,13 @@ impl<'a> Node<'a> {
         let mut rng = thread_rng();
         let mut board = self.board;
         let mut moves_count = 0;
+        let mut buf = Vec::with_capacity(81);
         while board.winner() == Winner::InProgress {
-            let moves = board.generate_moves();
-            let m = moves.choose(&mut rng).unwrap();
+            board.generate_moves_in_place(&mut buf);
+            let m = buf.choose(&mut rng).unwrap();
             // SAFETY: m is a valid Move.
             board = unsafe { board.advance_state_unsafe(*m) };
+            buf.clear();
             moves_count += 1;
         }
 
