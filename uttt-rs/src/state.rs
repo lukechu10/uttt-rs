@@ -56,7 +56,8 @@ impl Board {
     }
 
     /// Returns the [`Board`] with the applied [`Move`] onto it. This does not change the original
-    /// [`Board`].
+    /// [`Board`]. This method also doesn't check if the move is valid in the context of the game
+    /// state.
     ///
     /// Switches the next player to move.
     ///
@@ -64,8 +65,8 @@ impl Board {
     ///
     /// - `m` must be a valid [`Move`], meaning that the `major` field and the `minor` field must be
     ///   between `0` and `8` inclusive. Any value outside this range will cause undefined behavior.
-    #[must_use = "advanced_state does not modify original Board"]
-    pub unsafe fn advance_state(mut self, m: Move) -> Self {
+    #[must_use = "advanced_state_unsafe does not modify original Board"]
+    pub unsafe fn advance_state_unsafe(mut self, m: Move) -> Self {
         // SAFETY: range is guaranteed to be valid by the caller. `board` is of length 9 and m.major
         // is in range 0..9.
         let sub_board = self.board.get_unchecked_mut(m.major as usize);
@@ -119,6 +120,36 @@ impl Board {
         };
 
         self
+    }
+
+    /// Returns the [`Board`] with the applied [`Move`] onto it or `None` if the move is invalid.
+    /// This does not change the original [`Board`].
+    ///
+    /// Switches the next player to move.
+    ///
+    /// For performance critical code, prefer [`advance_state_unsafe`] instead.
+    pub fn advance_state(self, m: Move) -> Option<Self> {
+        // First, check that Move major and minor indexes are in range 0..9.
+        if m.major > 8 || m.minor > 8 {
+            return None;
+        }
+        // Check that cell is open.
+        let sub_board = self.board[m.major as usize];
+        let mask = 1 << m.minor;
+        if sub_board.x.0 & mask != 0 || sub_board.o.0 & mask != 0 {
+            return None;
+        }
+        // Check that the sub-board is the one the player is supposed to move in.
+        if self.next_sub_board != 9 && self.next_sub_board != m.major as u32 {
+            return None;
+        }
+        // Check that the sub-board has not already been won.
+        let mask = 1 << m.major;
+        if self.sub_wins.x.0 & mask != 0 || self.sub_wins.o.0 & mask != 0 {
+            return None;
+        }
+        // Move is valid, advance the state.
+        Some(unsafe { self.advance_state_unsafe(m) })
     }
 
     pub fn generate_moves(&self) -> Vec<Move> {

@@ -98,9 +98,9 @@ fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
     let on_click = move |_| {
         // Update board.
         let m = Move::new(major.0 * 3 + major.1, minor.0 * 3 + minor.1);
-        // SAFETY: m is valid because it is constructed with Move::new.
-        unsafe {
-            board.set(board.get().advance_state(m));
+        let next = board.get().advance_state(m);
+        if let Some(next) = next {
+            board.set(next);
         }
     };
 

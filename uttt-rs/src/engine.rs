@@ -73,7 +73,7 @@ impl<'a> Node<'a> {
 
         // Expand node.
         // SAFETY: m is a valid Move.
-        let next = unsafe { self.board.advance_state(m) };
+        let next = unsafe { self.board.advance_state_unsafe(m) };
         let next_node = Node::new(Some(self), next, Some(m));
         let next_node_ref = bump.alloc(next_node);
         self.children.borrow_mut().expanded.push(next_node_ref);
@@ -89,7 +89,7 @@ impl<'a> Node<'a> {
             let moves = board.generate_moves();
             let m = moves.choose(&mut rng).unwrap();
             // SAFETY: m is a valid Move.
-            board = unsafe { board.advance_state(*m) };
+            board = unsafe { board.advance_state_unsafe(*m) };
         }
 
         board.winner()
