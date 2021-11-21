@@ -152,7 +152,8 @@ impl Board {
         Some(unsafe { self.advance_state_unsafe(m) })
     }
 
-    pub fn generate_moves_in_place(&self, moves: &mut Vec<Move>) {
+    pub fn generate_moves_in_place<'a>(&self, moves: &'a mut [Move; 81]) -> &'a [Move] {
+        let mut moves_ptr = moves.as_mut_ptr();
         match self.next_sub_board {
             0..=8 => {
                 // Can only move in a specific sub-board.
@@ -160,10 +161,20 @@ impl Board {
                 let or = sub_board.x.0 | sub_board.o.0;
                 for i in 0..=8 {
                     if or & 1 << i == 0 {
-                        moves.push(Move {
-                            major: self.next_sub_board,
-                            minor: i,
-                        });
+                        // SAFETY:
+                        // This code path will be executed at most 9 times which is below
+                        // the buffer size of 81.
+                        // Initially, moves_ptr is pointing to the first element of the buffer.
+                        // Therefore the first iteration of the loop will write to the first element
+                        // of the buffer. Subsequent iterations will write to the next element and
+                        // so forth but will never exceed the length of 81.
+                        unsafe {
+                            *moves_ptr = Move {
+                                major: self.next_sub_board,
+                                minor: i,
+                            };
+                            moves_ptr = moves_ptr.add(1);
+                        }
                     }
                 }
             }
@@ -179,10 +190,22 @@ impl Board {
                         // Sub-board is available. Generate moves for sub-board.
                         for j in 0..=8 {
                             if or & 1 << j == 0 {
-                                moves.push(Move {
-                                    major: i as u32,
-                                    minor: j,
-                                });
+                                // SAFETY:
+                                // This code path will be executed at most 81 times which is equal
+                                // the buffer size of 81.
+                                // Initially, moves_ptr is pointing to the first element of the
+                                // buffer. Therefore the first
+                                // iteration of the loop will write to the first element
+                                // of the buffer. Subsequent iterations will write to the next
+                                // element and so forth but will
+                                // never exceed the length of 81.
+                                unsafe {
+                                    *moves_ptr = Move {
+                                        major: i as u32,
+                                        minor: j,
+                                    };
+                                    moves_ptr = moves_ptr.add(1);
+                                }
                             }
                         }
                     }
@@ -190,12 +213,17 @@ impl Board {
             }
             _ => unreachable!("invalid value for self.next_sub_board"),
         }
+
+        // SAFETY: moves_ptr is pointing to an element of buf or address after the last element.
+        // It is derived from moves.as_ptr().
+        let len = unsafe { moves_ptr.offset_from(moves.as_ptr()) };
+        &moves[..len as usize]
     }
 
     pub fn generate_moves(&self) -> Vec<Move> {
-        let mut moves = Vec::new();
-        self.generate_moves_in_place(&mut moves);
-        moves
+        let mut buf = [Move::new(0, 0); 81];
+        let moves = self.generate_moves_in_place(&mut buf);
+        moves.iter().copied().collect()
     }
 
     pub fn winner(&self) -> Winner {
