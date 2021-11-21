@@ -216,8 +216,8 @@ impl Board {
 
         // SAFETY: moves_ptr is pointing to an element of buf or address after the last element.
         // It is derived from moves.as_ptr().
-        let len = unsafe { moves_ptr.offset_from(moves.as_ptr()) };
-        &moves[..len as usize]
+        let len = unsafe { moves_ptr.offset_from(moves.as_ptr()) } as usize;
+        unsafe { std::slice::from_raw_parts(moves.as_ptr(), len) }
     }
 
     pub fn generate_moves(&self) -> Vec<Move> {
