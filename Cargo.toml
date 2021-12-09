@@ -12,7 +12,12 @@ log = "0.4.14"
 getrandom = { version = "0.2.3", features = ["js"] }
 gloo-timers = { version = "0.2.1", features = ["futures"] }
 instant = { version = "0.1.12", features = ["wasm-bindgen"] }
-sycamore = { git = "https://github.com/sycamore-rs/sycamore", rev = "df16d18", features = [
-    "futures",
-] }
+sycamore = { version = "0.7.0", features = ["futures"] }
 uttt-rs = { path = "./uttt-rs" }
+
+[workspace]
+members = ["uttt-rs"]
+
+[profile.release-debug]
+debug = true
+inherits = "release"
