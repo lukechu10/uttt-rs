@@ -1,4 +1,4 @@
 module.exports = {
     mode: "jit",
-    purge: ["./src/**/*.rs"]
+    content: ["./src/**/*.rs"]
 }

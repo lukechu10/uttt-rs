@@ -1,4 +1,5 @@
 use gloo_timers::future::TimeoutFuture;
+use sycamore::context::{use_context, ContextProvider, ContextProviderProps};
 use sycamore::futures::spawn_local_in_scope;
 use sycamore::prelude::*;
 use uttt_rs::{Board, MctsEngine, Move, Player, Winner};
@@ -64,11 +65,14 @@ fn use_sub_board_state(board: ReadSignal<Board>, major: (u32, u32)) -> ReadSigna
 #[component(GameView<G>)]
 fn game_view() -> View<G> {
     let board = Signal::new(Board::new());
+
     let difficulty = Signal::new(100);
+
     let msg = Signal::new("".to_string());
+    let move_list = Signal::new(Vec::<(Player, Move, Board)>::new());
 
     // When board changes and player is O, run AI.
-    create_effect(cloned!(board, difficulty, msg => move || {
+    create_effect(cloned!(board, difficulty, msg, move_list => move || {
         if board.get().player_to_move == Player::O {
             // Make sure that game is not finished.
             if board.get().winner() != Winner::InProgress {
@@ -76,7 +80,7 @@ fn game_view() -> View<G> {
             }
             msg.set("Running AI...".to_string());
             // We run the AI in the next micro-task to allow for transitions to finish.
-            spawn_local_in_scope(cloned!(board, difficulty, msg => async move {
+            spawn_local_in_scope(cloned!(board, difficulty, msg, move_list => async move {
                 // Wait 300ms because that is the duration for the transition for sub-board state.
                 TimeoutFuture::new(300).await;
                 let mcts = MctsEngine::new();
@@ -85,17 +89,34 @@ fn game_view() -> View<G> {
                 let m = mcts.best_move();
                 board.set(board.get().advance_state(m).unwrap());
 
+                move_list.set(
+                    move_list
+                        .get()
+                        .iter()
+                        .cloned()
+                        .chain(Some((Player::O, m, *board.get())))
+                        .collect(),
+                );
+
                 msg.set(format!("AI simulated {} games and {} moves in {}ms.", iters, moves, *difficulty.get_untracked()));
             }));
         }
     }));
 
     view! {
-        DifficultySelector(difficulty)
-        p(class="h-12 py-2") {
-            (msg.get())
-        }
-        GameBoard(board)
+        ContextProvider(ContextProviderProps {
+            value: move_list,
+            children: move || view! {
+                DifficultySelector(difficulty)
+                p(class="h-12 py-2") {
+                    (msg.get())
+                }
+                div(class="flex flex-wrap flex-row") {
+                    GameBoard(board)
+                    MoveHistory()
+                }
+            }
+        })
     }
 }
 
@@ -153,6 +174,8 @@ fn sub_board(props: (Signal<Board>, (u32, u32))) -> View<G> {
 #[component(BoardCell<G>)]
 fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
     let (board, major, minor) = props;
+    let move_list = use_context::<Signal<Vec<(Player, Move, Board)>>>();
+
     let state = use_board_cell(board.handle(), major, minor);
     let class = create_memo(cloned!(state => move || {
         match *state.get() {
@@ -175,7 +198,16 @@ fn board_cell(props: (Signal<Board>, (u32, u32), (u32, u32))) -> View<G> {
         let m = Move::new(major.0 * 3 + major.1, minor.0 * 3 + minor.1);
         let next = board.get().advance_state(m);
         if let Some(next) = next {
+            // Make sure that move is valid. If invalid, do nothing.
             board.set(next);
+            move_list.set(
+                move_list
+                    .get()
+                    .iter()
+                    .cloned()
+                    .chain(Some((Player::X, m, next)))
+                    .collect(),
+            );
         }
     };
 
@@ -224,6 +256,42 @@ fn difficulty_option(props: (Signal<u128>, &'static str, u128)) -> View<G> {
     }));
     view! {
         button(class=class.get(), on:click=move |_| difficulty.set(value)) { (name) ": " (value) "ms" }
+    }
+}
+
+#[component(MoveHistory<G>)]
+fn move_history() -> View<G> {
+    let move_list = use_context::<Signal<Vec<(Player, Move, Board)>>>();
+
+    view! {
+        div(class="move-history") {
+            h2(class="text-lg text-center") { "Moves" }
+            table(class="table-auto min-w-[250px] text-center") {
+                thead {
+                    tr {
+                        th(class="w-[80px]") { "Player" }
+                        th(class="w-[170px]") { "Move" }
+                    }
+                }
+                tbody {
+                    Indexed(IndexedProps {
+                        iterable: move_list.handle(),
+                        template: |(player, m, _)| view! {
+                            tr {
+                                td { (format!("{:?}", player)) }
+                                // Extract row and column from index
+                                td {
+                                    "(" (m.major / 3 + 1)
+                                    ", " (m.major % 3 + 1)
+                                    ") (" (m.minor / 3 + 1)
+                                    ", " (m.minor % 3 + 1) ")"
+                                }
+                            }
+                        }
+                    })
+                }
+            }
+        }
     }
 }
 
