@@ -91,22 +91,13 @@ fn GameView<G: Html>(cx: Scope) -> View<G> {
                 let (iters, moves) = mcts.run_search(*difficulty.get_untracked());
                 let m = mcts.best_move();
                 board.set(board.get().advance_state(m).unwrap());
-
-                move_list.set(
-                    move_list
-                        .get()
-                        .iter()
-                        .cloned()
-                        .chain(Some((Player::O, m, *board.get())))
-                        .collect(),
-                );
-
                 msg.set(format!(
                     "AI simulated {} games and {} moves in {}ms.",
                     iters,
                     moves,
                     *difficulty.get_untracked()
                 ));
+                move_list.modify().push((Player::O, m, *board.get()));
             });
         }
     });
@@ -160,7 +151,7 @@ fn SubBoard<'a, G: Html>(cx: Scope<'a>, major: (u32, u32)) -> View<G> {
                 let mut tmp = Vec::new();
                 for i in 0..3 {
                     for j in 0..3 {
-                        tmp.push(view! { cx, BoardCell((board.clone(), major, (i, j))) })
+                        tmp.push(view! { cx, BoardCell((board, major, (i, j))) })
                     }
                 }
                 View::new_fragment(tmp)
@@ -202,14 +193,7 @@ fn BoardCell<'a, G: Html>(
         if let Some(next) = next {
             // Make sure that move is valid. If invalid, do nothing.
             board.set(next);
-            move_list.set(
-                move_list
-                    .get()
-                    .iter()
-                    .cloned()
-                    .chain(Some((Player::X, m, next)))
-                    .collect(),
-            );
+            move_list.modify().push((Player::X, m, next));
         }
     };
 
