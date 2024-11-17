@@ -16,11 +16,6 @@ jobs:
           toolchain: stable
           target: wasm32-unknown-unknown
 
-      - name: Setup Node
-        uses: actions/setup-node@v1
-        with:
-          node-version: 20
-
       - name: Install trunk
         run: >
           wget -qO-
@@ -36,8 +31,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - run: npm ci
 
       - name: Build
         run: trunk build --release --public-url /uttt-rs/
