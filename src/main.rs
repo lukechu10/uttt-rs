@@ -214,8 +214,8 @@ fn DifficultySelector<'a, G: Html>(cx: Scope<'a>, difficulty: &'a Signal<u128>) 
     view! { cx,
         h2(class="text-lg") { "Difficulty:" }
         div(class="flex flex-row space-x-4") {
-            Indexed {
-                iterable: create_signal(cx, vec![
+            Indexed(
+                iterable=create_signal(cx, vec![
                     ("Noob", 50),
                     ("Easy", 100),
                     ("Medium", 500),
@@ -223,10 +223,10 @@ fn DifficultySelector<'a, G: Html>(cx: Scope<'a>, difficulty: &'a Signal<u128>) 
                     ("Boss", 2000),
                     ("Insane", 5000),
                 ]),
-                view: |cx, (name, value)| view! { cx,
+                view=|cx, (name, value)| view! { cx,
                     DifficultyOption((name, value))
                 },
-            }
+            )
         }
     }
 }
@@ -261,9 +261,9 @@ fn MoveHistory<G: Html>(cx: Scope) -> View<G> {
                     }
                 }
                 tbody {
-                    Indexed {
-                        iterable: move_list,
-                        view: |cx, (player, m, _)| view! { cx,
+                    Indexed(
+                        iterable=move_list,
+                        view=|cx, (player, m, _)| view! { cx,
                             tr {
                                 td { (format!("{:?}", player)) }
                                 // Extract row and column from index
@@ -275,7 +275,7 @@ fn MoveHistory<G: Html>(cx: Scope) -> View<G> {
                                 }
                             }
                         }
-                    }
+                    )
                 }
             }
         }

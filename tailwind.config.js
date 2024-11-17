@@ -1,4 +1,3 @@
 module.exports = {
-    mode: "jit",
-    content: ["./src/**/*.rs"]
-}
+	content: ["./src/**/*.rs"],
+};
