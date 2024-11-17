@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>Ultimate TicTacToe AI</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+	<meta name="description"
+		content="Online Ultimate TicTacToe game with AI opponent based on Monte Carlo Tree Search algorithm. Implemented in Rust." />
+
+	<link rel="stylesheet" href="/uttt-rs/global-a69d472896d73f10.css" integrity="sha384&#x2D;kzdVgSbkadNiWEZ2gl05Ae9cY0&#x2B;Deba8WztVItAMqK3AT3&#x2B;pAzbn2Be&#x2B;Z9mPHRnO"/>
+	
+<script type="module" nonce="dhH/LXyZ2JYn0MyqbQq47w==">
+import init, * as bindings from '/uttt-rs/uttt-gui-8522049185606245.js';
+const wasm = await init({ module_or_path: '/uttt-rs/uttt-gui-8522049185606245_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+	<base href="/uttt-rs/" />
+<link rel="modulepreload" href="/uttt-rs/uttt-gui-8522049185606245.js" crossorigin=anonymous integrity="sha384-BfKdPffVR6N048qhLTRUJbuW1jWmWM2+/svgY8IKFnD9qSn2NhtAtVbJArqcRca2"><link rel="preload" href="/uttt-rs/uttt-gui-8522049185606245_bg.wasm" crossorigin=anonymous integrity="sha384-2bMGxZLcMvdvBrETDIS1j1cWPLQ+Ef1FqJPK/YeKE/VkdF5eNbnVV0MEe05yBbmF" as="fetch" type="application/wasm"></head>
+
+<body></body>
+
+</html>
