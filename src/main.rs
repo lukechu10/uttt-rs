@@ -3,8 +3,8 @@ use sycamore::{futures::spawn_local_scoped, prelude::*};
 use uttt_rs::{Board, MctsEngine, Move, Player, Winner};
 
 #[component]
-fn App<G: Html>(cx: Scope) -> View<G> {
-    view! { cx,
+fn App() -> View {
+    view! {
         div(class="container mx-auto font-mono") {
             h1(class="text-xl text-center mb-4 underline") { "Ultimate TicTacToe" }
             GameView {}
@@ -12,16 +12,15 @@ fn App<G: Html>(cx: Scope) -> View<G> {
     }
 }
 
-fn use_board_cell<'a>(
-    cx: Scope<'a>,
-    board: &'a ReadSignal<Board>,
+fn use_board_cell(
+    board: ReadSignal<Board>,
     major: (u32, u32),
     minor: (u32, u32),
-) -> &'a ReadSignal<Option<Player>> {
+) -> ReadSignal<Option<Player>> {
     let major_i = major.0 * 3 + major.1;
     let minor_i = minor.0 * 3 + minor.1;
 
-    create_selector(cx, move || {
+    create_selector(move || {
         let sub_board = board.get().board[major_i as usize];
         let mask = 1 << minor_i;
         if sub_board.x.0 & mask != 0 {
@@ -40,14 +39,10 @@ enum SubBoardState {
     Next,
 }
 
-fn use_sub_board_state<'a>(
-    cx: Scope<'a>,
-    board: &'a ReadSignal<Board>,
-    major: (u32, u32),
-) -> &'a ReadSignal<SubBoardState> {
+fn use_sub_board_state(board: ReadSignal<Board>, major: (u32, u32)) -> ReadSignal<SubBoardState> {
     let i = major.0 * 3 + major.1;
 
-    create_selector(cx, move || {
+    create_selector(move || {
         // Check win state of sub-board.
         let sub_board = board.get().sub_wins;
         let mask = 1 << i;
@@ -66,16 +61,16 @@ fn use_sub_board_state<'a>(
 }
 
 #[component]
-fn GameView<G: Html>(cx: Scope) -> View<G> {
-    let board = create_signal(cx, Board::new());
+fn GameView() -> View {
+    let board = create_signal(Board::new());
 
-    let difficulty = create_signal(cx, 100);
+    let difficulty = create_signal(100);
 
-    let msg = create_signal(cx, "".to_string());
-    let move_list = create_signal(cx, Vec::<(Player, Move, Board)>::new());
+    let msg = create_signal("".to_string());
+    let move_list = create_signal(Vec::<(Player, Move, Board)>::new());
 
     // When board changes and player is O, run AI.
-    create_effect(cx, move || {
+    create_effect(move || {
         if board.get().player_to_move == Player::O {
             // Make sure that game is not finished.
             if board.get().winner() != Winner::InProgress {
@@ -83,31 +78,31 @@ fn GameView<G: Html>(cx: Scope) -> View<G> {
             }
             msg.set("Running AI...".to_string());
             // We run the AI in the next micro-task to allow for transitions to finish.
-            spawn_local_scoped(cx, async move {
+            spawn_local_scoped(async move {
                 // Wait 300ms because that is the duration for the transition for sub-board state.
                 TimeoutFuture::new(300).await;
                 let mcts = MctsEngine::new();
-                mcts.initialize(*board.get());
-                let (iters, moves) = mcts.run_search(*difficulty.get_untracked());
+                mcts.initialize(board.get());
+                let (iters, moves) = mcts.run_search(difficulty.get_untracked());
                 let m = mcts.best_move();
                 board.set(board.get().advance_state(m).unwrap());
                 msg.set(format!(
                     "AI simulated {} games and {} moves in {}ms.",
                     iters,
                     moves,
-                    *difficulty.get_untracked()
+                    difficulty.get_untracked()
                 ));
-                move_list.modify().push((Player::O, m, *board.get()));
+                move_list.update(|list| list.push((Player::O, m, board.get())));
             });
         }
     });
 
-    provide_context_ref(cx, move_list);
-    provide_context_ref(cx, board);
-    view! { cx,
-        DifficultySelector(difficulty)
+    provide_context(move_list);
+    provide_context(board);
+    view! {
+        DifficultySelector(difficulty=difficulty)
         p(class="h-12 py-2") {
-            (msg.get())
+            (msg)
         }
         div(class="flex flex-wrap flex-row") {
             GameBoard {}
@@ -117,27 +112,27 @@ fn GameView<G: Html>(cx: Scope) -> View<G> {
 }
 
 #[component]
-fn GameBoard<G: Html>(cx: Scope) -> View<G> {
-    view! { cx,
+fn GameBoard() -> View {
+    view! {
         div(class="game-board mx-auto") {
             ({
                 let mut tmp = Vec::new();
                 for i in 0..3 {
                     for j in 0..3 {
-                        tmp.push(view! { cx, SubBoard((i, j)) })
+                        tmp.push(view! { SubBoard(major=(i, j)) })
                     }
                 }
-                View::new_fragment(tmp)
+                tmp
             })
         }
     }
 }
 
-#[component]
-fn SubBoard<'a, G: Html>(cx: Scope<'a>, major: (u32, u32)) -> View<G> {
-    let board = use_context::<Signal<Board>>(cx);
-    let state = use_sub_board_state(cx, board, major);
-    let class = create_memo(cx, || match *state.get() {
+#[component(inline_props)]
+fn SubBoard(major: (u32, u32)) -> View {
+    let board = use_context::<Signal<Board>>();
+    let state = use_sub_board_state(*board, major);
+    let class = create_memo(move || match state.get() {
         SubBoardState::Winner(Winner::X) => "sub-board x",
         SubBoardState::Winner(Winner::O) => "sub-board o",
         SubBoardState::Winner(Winner::Tie) => "sub-board tie",
@@ -145,34 +140,27 @@ fn SubBoard<'a, G: Html>(cx: Scope<'a>, major: (u32, u32)) -> View<G> {
         SubBoardState::Winner(Winner::InProgress) => "sub-board in-progress",
     });
 
-    view! { cx,
+    view! {
         div(class=class.get()) {
             ({
                 let mut tmp = Vec::new();
                 for i in 0..3 {
                     for j in 0..3 {
-                        tmp.push(view! { cx, BoardCell((board, major, (i, j))) })
+                        tmp.push(view! { BoardCell(board=board, major=major, minor=(i, j)) })
                     }
                 }
-                View::new_fragment(tmp)
+                tmp
             })
         }
     }
 }
 
-/// # Props
-/// - `0`: `Signal<Board>`, the game board state.
-/// - `1`: `(u32, u32)`, the position of the sub-board.
-/// - `2`: `(u32, u32)`, the position of the cell within the sub-board.
-#[component]
-fn BoardCell<'a, G: Html>(
-    cx: Scope<'a>,
-    (board, major, minor): (&'a Signal<Board>, (u32, u32), (u32, u32)),
-) -> View<G> {
-    let move_list = use_context::<Signal<Vec<(Player, Move, Board)>>>(cx);
+#[component(inline_props)]
+fn BoardCell(board: Signal<Board>, major: (u32, u32), minor: (u32, u32)) -> View {
+    let move_list = use_context::<Signal<Vec<(Player, Move, Board)>>>();
 
-    let state = use_board_cell(cx, board, major, minor);
-    let class = create_memo(cx, || match *state.get() {
+    let state = use_board_cell(*board, major, minor);
+    let class = create_memo(move || match state.get() {
         Some(Player::X) => "cell x",
         Some(Player::O) => "cell o",
         None => "cell empty",
@@ -193,13 +181,13 @@ fn BoardCell<'a, G: Html>(
         if let Some(next) = next {
             // Make sure that move is valid. If invalid, do nothing.
             board.set(next);
-            move_list.modify().push((Player::X, m, next));
+            move_list.update(|list| list.push((Player::X, m, next)));
         }
     };
 
-    view! { cx,
+    view! {
         div(class=class.get(), on:click=on_click) {
-            (match *state.get() {
+            (match state.get() {
                 Some(Player::X) => "X",
                 Some(Player::O) => "O",
                 None => ""
@@ -208,14 +196,14 @@ fn BoardCell<'a, G: Html>(
     }
 }
 
-#[component]
-fn DifficultySelector<'a, G: Html>(cx: Scope<'a>, difficulty: &'a Signal<u128>) -> View<G> {
-    provide_context_ref(cx, difficulty);
-    view! { cx,
+#[component(inline_props)]
+fn DifficultySelector(difficulty: Signal<u128>) -> View {
+    provide_context(difficulty);
+    view! {
         h2(class="text-lg") { "Difficulty:" }
         div(class="flex flex-row space-x-4") {
             Indexed(
-                iterable=create_signal(cx, vec![
+                list=create_signal( vec![
                     ("Noob", 50),
                     ("Easy", 100),
                     ("Medium", 500),
@@ -223,34 +211,34 @@ fn DifficultySelector<'a, G: Html>(cx: Scope<'a>, difficulty: &'a Signal<u128>) 
                     ("Boss", 2000),
                     ("Insane", 5000),
                 ]),
-                view=|cx, (name, value)| view! { cx,
-                    DifficultyOption((name, value))
+                view=|(name, value)| view! {
+                    DifficultyOption(name=name, value=value)
                 },
             )
         }
     }
 }
 
-#[component]
-fn DifficultyOption<'a, G: Html>(cx: Scope<'a>, (name, value): (&'static str, u128)) -> View<G> {
-    let difficulty = use_context::<Signal<u128>>(cx);
-    let class = create_memo(cx, move || {
-        if *difficulty.get() == value {
+#[component(inline_props)]
+fn DifficultyOption(name: &'static str, value: u128) -> View {
+    let difficulty = use_context::<Signal<u128>>();
+    let class = create_memo(move || {
+        if difficulty.get() == value {
             "font-bold underline"
         } else {
             ""
         }
     });
-    view! { cx,
+    view! {
         button(class=class.get(), on:click=move |_| difficulty.set(value)) { (name) ": " (value) "ms" }
     }
 }
 
 #[component]
-fn MoveHistory<G: Html>(cx: Scope) -> View<G> {
-    let move_list = use_context::<Signal<Vec<(Player, Move, Board)>>>(cx);
+fn MoveHistory() -> View {
+    let move_list = use_context::<Signal<Vec<(Player, Move, Board)>>>();
 
-    view! { cx,
+    view! {
         div(class="move-history") {
             h2(class="text-lg text-center") { "Moves" }
             table(class="table-auto min-w-[250px] text-center") {
@@ -262,8 +250,8 @@ fn MoveHistory<G: Html>(cx: Scope) -> View<G> {
                 }
                 tbody {
                     Indexed(
-                        iterable=move_list,
-                        view=|cx, (player, m, _)| view! { cx,
+                        list=move_list,
+                        view=|(player, m, _)| view! {
                             tr {
                                 td { (format!("{:?}", player)) }
                                 // Extract row and column from index
@@ -286,9 +274,5 @@ fn main() {
     console_error_panic_hook::set_once();
     console_log::init().expect("could not initialize console_log");
 
-    sycamore::render(|cx| {
-        view! { cx,
-            App {}
-        }
-    })
+    sycamore::render(App)
 }
