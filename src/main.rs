@@ -272,7 +272,6 @@ fn MoveHistory() -> View {
 
 fn main() {
     console_error_panic_hook::set_once();
-    console_log::init().expect("could not initialize console_log");
 
     sycamore::render(App)
 }
